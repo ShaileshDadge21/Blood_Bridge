@@ -8,7 +8,6 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'Blood Bridge',
         short_name: 'BloodBridge',
@@ -19,14 +18,16 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'https://cdn-icons-png.flflaticon.com/512/3011/3011270.png',
+            src: 'https://img.icons8.com/color/512/drop-blood.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           },
           {
-            src: 'https://cdn-icons-png.flflaticon.com/512/3011/3011270.png',
+            src: 'https://img.icons8.com/color/512/drop-blood.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       }
