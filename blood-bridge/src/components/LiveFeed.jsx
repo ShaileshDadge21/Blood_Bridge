@@ -93,9 +93,14 @@ export default function LiveFeed() {
               </div>
 
               <a 
-                href={`https://www.google.com/maps/search/?api=1&query=${req.lat},${req.lng}`}
-                target="_blank" 
-                rel="noopener noreferrer"
+                href={`geo:${req.lat},${req.lng}?q=${req.lat},${req.lng}(${encodeURIComponent(req.hospital_name)})`}
+                onClick={(e) => {
+                  // Fallback for desktop or browsers that don't handle geo: URIs
+                  if (!navigator.userAgent.match(/Android|iPhone|iPad|iPod/i)) {
+                    e.preventDefault();
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${req.lat},${req.lng}`, '_blank');
+                  }
+                }}
                 className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs py-2.5 flex justify-center items-center gap-2 transition-colors"
               >
                 Navigate to Location
