@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { AlertTriangle, MapPin, Phone, Clock, Droplets, CheckCircle } from 'lucide-react';
+import { AlertTriangle, MapPin, Clock, Droplets, CheckCircle, Filter } from 'lucide-react';
 
 export default function LiveFeed() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedGroup, setSelectedGroup] = useState('ALL');
+
+  const bloodGroups = ['ALL', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
   useEffect(() => {
     async function fetchRequests() {
@@ -24,7 +27,6 @@ export default function LiveFeed() {
 
     fetchRequests();
 
-    // Set up real-time subscription so new SOS alerts appear instantly without refreshing
     const subscription = supabase
       .channel('public:emergency_requests')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'emergency_requests' }, payload => {
@@ -37,9 +39,14 @@ export default function LiveFeed() {
     };
   }, []);
 
+  // Filter requests based on selected blood group
+  const filteredRequests = selectedGroup === 'ALL' 
+    ? requests 
+    : requests.filter(req => req.blood_group === selectedGroup);
+
   return (
     <div className="p-6 pb-24 max-w-md mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Live Feed</h2>
           <p className="text-xs text-slate-500">Active emergency blood requests</p>
@@ -50,17 +57,35 @@ export default function LiveFeed() {
         </div>
       </div>
 
+      {/* Blood Group Filter Chips */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-4 no-scrollbar">
+        <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 mr-0.5" />
+        {bloodGroups.map((group) => (
+          <button
+            key={group}
+            onClick={() => setSelectedGroup(group)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-colors ${
+              selectedGroup === group
+                ? 'bg-red-600 text-white shadow-sm shadow-red-200'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {group}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="text-center py-12 text-slate-400 text-sm">Loading active emergencies...</div>
-      ) : requests.length === 0 ? (
+      ) : filteredRequests.length === 0 ? (
         <div className="bg-white rounded-3xl p-8 text-center border border-slate-100 shadow-sm">
           <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-          <h3 className="font-bold text-slate-900">No active emergencies</h3>
-          <p className="text-xs text-slate-500 mt-1">All clear across the Bengaluru network.</p>
+          <h3 className="font-bold text-slate-900">No matching emergencies</h3>
+          <p className="text-xs text-slate-500 mt-1">No active requests found for {selectedGroup}.</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {requests.map((req) => (
+          {filteredRequests.map((req) => (
             <div key={req.id || req.created_at} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-2 h-full bg-red-600"></div>
               
@@ -95,7 +120,6 @@ export default function LiveFeed() {
               <a 
                 href={`geo:${req.lat},${req.lng}?q=${req.lat},${req.lng}(${encodeURIComponent(req.hospital_name)})`}
                 onClick={(e) => {
-                  // Fallback for desktop or browsers that don't handle geo: URIs
                   if (!navigator.userAgent.match(/Android|iPhone|iPad|iPod/i)) {
                     e.preventDefault();
                     window.open(`https://www.google.com/maps/search/?api=1&query=${req.lat},${req.lng}`, '_blank');
