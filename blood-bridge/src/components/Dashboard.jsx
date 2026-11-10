@@ -1,46 +1,71 @@
 import { useState } from 'react';
-import { AlertCircle, Activity, Droplets} from 'lucide-react';
+import { AlertCircle, Activity, Droplets } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import DonorMap from './DonorMap';
 
 export default function Dashboard() {
   const [isAvailable, setIsAvailable] = useState(true);
   const [sosActive, setSosActive] = useState(false);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // NEW: Dynamic States
+  const [bloodGroup, setBloodGroup] = useState('O+');
+  const [statusMsg, setStatusMsg] = useState('Alert verified donors within your radius.');
 
   const handleSOS = async () => {
-    // If it's already active, just turn it off locally
     if (sosActive) {
       setSosActive(false);
+      setStatusMsg('Alert verified donors within your radius.');
       return;
     }
 
     setIsSubmitting(true);
-    try {
-      const { error } = await supabase
-        .from('emergency_requests')
-        .insert([
-          {
-            hospital_name: 'KIMS Hospital, VV Puram',
-            blood_group: 'O-',
-            units_needed: 2,
-            urgency_level: 'Critical',
-            lat: 12.9546,
-            lng: 77.5754
-          }
-        ]);
+    setStatusMsg('Acquiring live GPS location...');
 
-      if (error) throw error;
-      
-      // If successful, activate the pulsing UI
-      setSosActive(true);
-    } catch (error) {
-      console.error("Error sending SOS:", error.message);
-      alert("Failed to send alert. Check console.");
-    } finally {
+    // NEW: Get the user's actual device location
+    if (!navigator.geolocation) {
+      setStatusMsg('Geolocation is not supported by your browser.');
       setIsSubmitting(false);
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setStatusMsg('Broadcasting to emergency network...');
+
+        try {
+          // NEW: Sending the dynamic blood group and real GPS coordinates
+          const { error } = await supabase
+            .from('emergency_requests')
+            .insert([
+              {
+                hospital_name: 'Live User Location',
+                blood_group: bloodGroup,
+                units_needed: 1,
+                urgency_level: 'Critical',
+                lat: latitude,
+                lng: longitude
+              }
+            ]);
+
+          if (error) throw error;
+          
+          setSosActive(true);
+          setStatusMsg(`🚨 BROADCASTING ${bloodGroup} REQUIREMENT TO NEARBY DONORS`);
+        } catch (error) {
+          console.error("Error:", error.message);
+          setStatusMsg('Failed to send alert. Check console.');
+        } finally {
+          setIsSubmitting(false);
+        }
+      },
+      (error) => {
+        console.error(error);
+        setStatusMsg('Location access denied. Please enable GPS.');
+        setIsSubmitting(false);
+      }
+    );
   };
 
   return (
@@ -53,39 +78,57 @@ export default function Dashboard() {
           </div>
           <div>
             <p className="text-xs text-slate-500 font-medium">Good morning,</p>
-            <h1 className="text-lg font-bold text-slate-900">Alex Morgan</h1>
+            <h1 className="text-lg font-bold text-slate-900">Donor</h1>
           </div>
-        </div>
-        <div className="bg-red-50 text-red-600 font-bold px-3 py-1 rounded-full text-sm">
-          O-
         </div>
       </div>
 
       <div className="p-6 space-y-6">
         {/* SOS Card */}
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 text-center">
-          <h2 className="font-bold text-slate-900 text-lg mb-1">Need blood urgently?</h2>
-          <p className="text-sm text-slate-500 mb-6">Alert verified donors within your radius.</p>
+          <h2 className="font-bold text-slate-900 text-lg mb-4">Need blood urgently?</h2>
           
+          {/* NEW: Blood Type Selector */}
+          {!sosActive && (
+            <div className="mb-6 flex justify-center items-center gap-3">
+              <label className="text-sm font-medium text-slate-700">Required Type:</label>
+              <select 
+                value={bloodGroup}
+                onChange={(e) => setBloodGroup(e.target.value)}
+                className="bg-slate-100 border border-slate-200 text-slate-900 text-sm rounded-lg focus:ring-red-500 focus:border-red-500 block p-2.5 font-bold"
+              >
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+          )}
+
           <button 
             onClick={handleSOS}
             disabled={isSubmitting}
             className={`relative group mx-auto flex items-center justify-center w-32 h-32 rounded-full transition-all duration-300 ${
               sosActive ? 'bg-red-700 scale-95' : 'bg-red-600 hover:bg-red-500'
-            }${isSubmitting ? 'opacity-75 cursor-not-allowed' : ''}`}
+            } ${isSubmitting ? 'opacity-75 cursor-wait' : ''}`}
           >
-            {/* Pulsing ring effect */}
             {!sosActive && (
               <div className="absolute inset-0 rounded-full border-4 border-red-500 animate-ping opacity-20"></div>
             )}
             <div className="flex flex-col items-center text-white">
               <AlertCircle className="w-10 h-10 mb-1" />
-              <span className="font-bold tracking-wider">{isSubmitting ? "SENDING..." : "SOS"}</span>
+              <span className="font-bold tracking-wider">
+                {isSubmitting ? "LOCATING..." : "SOS"}
+              </span>
             </div>
           </button>
           
-          <p className="text-xs text-red-500 mt-6 font-medium">
-            {sosActive ? "🚨 EMERGENCY ALERT SENT TO NEARBY DONORS" : "Your location and blood type will be shared."}
+          <p className={`text-xs mt-6 font-medium ${sosActive || isSubmitting ? 'text-red-500' : 'text-slate-500'}`}>
+            {statusMsg}
           </p>
         </div>
 
@@ -109,7 +152,7 @@ export default function Dashboard() {
         </div>
         
         {/* Interactive Radius Map */}
-            <DonorMap />
+        <DonorMap />
       </div>
     </div>
   );
